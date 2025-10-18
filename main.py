@@ -88,7 +88,7 @@ class SignalAnalyzer(QMainWindow):
             self,
             "Open Data File",
             start_dir,
-            "CSV Files (*.csv);;All Files (*)"
+            "All Files (*)"
         )
 
         if not file_path:
@@ -102,9 +102,6 @@ class SignalAnalyzer(QMainWindow):
 
         try:
             self.data = pd.read_csv(file_path, low_memory=True)
-
-            # This removes empty rows at the end of the data file
-            self.data.dropna(how='all', inplace=True)
 
             # Get file size and data points and signal duration
             file_size = os.path.getsize(file_path)
@@ -120,7 +117,7 @@ class SignalAnalyzer(QMainWindow):
 
             print(f"File loaded!!! Size: {file_size_str}, rows {num_points}, duration: {signal_time_str}")
 
-            # x = x axis in array format ([0, 1, 2,...])
+            # x = x axis in array format
             # y1 = y axis of signal 1, y2 = y axis of signal 2
             self.x = np.arange(len(self.data))
             self.y1 = self.data["adc1"].values if "adc1" in self.data.columns else None
