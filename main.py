@@ -182,20 +182,21 @@ class SignalAnalyzer(QMainWindow):
         ax.legend()
         self.canvas.draw()
 
-    def minmax_downsample(self, x, y, n_bins=10_000):
+    def minmax_downsample(self, x, y, n_bins=None):
         N = len(y)
 
-        if N <= n_bins * 2:
+        if N <= 2000:
             return x, y
 
-        indices = (np.arange(N) * n_bins) // N
-        starts = np.flatnonzero(np.r_[True, np.diff(indices) > 0])
-        starts = np.r_[starts, N]
+        if n_bins is None:
+            n_bins = max(self.canvas.width(), 2000)
 
-        y_min = np.minimum.reduceat(y, starts[:-1])
-        y_max = np.maximum.reduceat(y, starts[:-1])
+        bins = np.linspace(0, N, n_bins + 1, dtype=int)
+        y_min = np.minimum.reduceat(y, bins[:-1])
+        y_max = np.maximum.reduceat(y, bins[:-1])
+        x_mid = x[(bins[:-1] + bins[1:]) // 2]
 
-        x_mid = x[(starts[:-1] + starts[1:]) // 2]
+        # print("Bins:", len(bins))
 
         out_len = 2 * len(x_mid)
         x_minmax = np.empty(out_len, dtype=x.dtype)
