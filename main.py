@@ -131,15 +131,18 @@ class SignalAnalyzer(QMainWindow):
             print("Load a data file first before plotting")
             return
 
+        self.plot_signals(self.x, self.y1, self.y2)
+
+    def plot_signals(self, x, y1, y2):
         self.figure.clear()
         ax = self.figure.add_subplot(111)
 
-        if self.y1 is not None:
-            x_down, y_down = self.minmax_downsample(self.x, self.y1)
+        if y1 is not None:
+            x_down, y_down = self.minmax_downsample(x, y1)
             ax.plot(x_down, y_down, label='Signal 1', linewidth=0.8)
 
-        if self.y2 is not None:
-            x_down, y_down = self.minmax_downsample(self.x, self.y2)
+        if y2 is not None:
+            x_down, y_down = self.minmax_downsample(x, y2)
             ax.plot(x_down, y_down, label='Signal 2', linewidth=0.8, alpha=0.9)
 
         ax.set_title("Signal data")
@@ -162,25 +165,10 @@ class SignalAnalyzer(QMainWindow):
                 self.update_plot_range(start_x_index, end_x_index)
 
     def update_plot_range(self, start_ind_x, end_ind_x):
-        self.figure.clear()
-        ax = self.figure.add_subplot(111)
-
         x_range = self.x[start_ind_x:end_ind_x]
-        if self.y1 is not None:
-            y_range = self.y1[start_ind_x:end_ind_x]
-            x_down, y_down = self.minmax_downsample(x_range, y_range)
-            ax.plot(x_down, y_down, label='Signal 1', linewidth=0.8)
-
-        if self.y2 is not None:
-            y_range = self.y2[start_ind_x:end_ind_x]
-            x_down, y_down = self.minmax_downsample(x_range, y_range)
-            ax.plot(x_down, y_down, label='Signal 2', linewidth=0.8, alpha=0.9)
-
-        ax.set_title("Signal data")
-        ax.set_xlabel("Time")
-        ax.set_ylabel("Response")
-        ax.legend()
-        self.canvas.draw()
+        y1_range = self.y1[start_ind_x:end_ind_x] if self.y1 is not None else None
+        y2_range = self.y2[start_ind_x:end_ind_x] if self.y2 is not None else None
+        self.plot_signals(x_range, y1_range, y2_range)
 
     def minmax_downsample(self, x, y, n_bins=None):
         N = len(y)
