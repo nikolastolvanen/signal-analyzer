@@ -83,6 +83,11 @@ class SignalAnalyzer(QMainWindow):
         self.slider_label = QLabel("Range: 0% – 100%")
         right_panel.addWidget(self.slider_label)
 
+        self.range_button = QPushButton("Reset range")
+        self.range_button.setFixedSize(100, 30)
+        self.range_button.clicked.connect(self.reset_slider_range)
+        right_panel.addWidget(self.range_button)
+
         self.data = None
         self.file_path = None
         self.i = None # Signal row index
@@ -208,6 +213,16 @@ class SignalAnalyzer(QMainWindow):
             self.plotting_end_index = int(end / 100 * total_data_points)
             if self.plotting_start_index < self.plotting_end_index:
                 self.plot_current_range()
+
+    def reset_slider_range(self):
+        if self.data is None:
+            return
+
+        self.range_slider.setValue((0, 100))
+        self.slider_label.setText("Range: 0% – 100%")
+        self.plotting_start_index = 0
+        self.plotting_end_index = len(self.i)
+        self.plot_current_range()
 
     def update_plot_range(self, start_ind_x, end_ind_x):
         x_range = self.i[start_ind_x:end_ind_x]
