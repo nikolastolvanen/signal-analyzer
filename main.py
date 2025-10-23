@@ -4,7 +4,8 @@ import pandas as pd
 import numpy as np
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QFileDialog,
-    QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QLabel
+    QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QLabel,
+    QCheckBox
 )
 from matplotlib.backends.backend_qt5agg import (
     FigureCanvasQTAgg as FigureCanvas,
@@ -13,6 +14,7 @@ from matplotlib.backends.backend_qt5agg import (
 from matplotlib.figure import Figure
 from qtpy.QtCore import Qt
 from superqt import QRangeSlider
+from scipy.signal import find_peaks as scipy_find_peaks
 
 
 class SignalAnalyzer(QMainWindow):
@@ -35,7 +37,7 @@ class SignalAnalyzer(QMainWindow):
         container.setLayout(main_layout)
         self.setCentralWidget(container)
 
-        # Left panel with plot button and some file info
+        # Left panel with plot button and some file info and checkbox to show peaks
         left_panel = QVBoxLayout()
         main_layout.addLayout(left_panel, 1)
 
@@ -54,6 +56,12 @@ class SignalAnalyzer(QMainWindow):
         self.plot_button = QPushButton("Plot")
         self.plot_button.clicked.connect(self.plot_data)
         left_panel.addWidget(self.plot_button)
+
+        self.peaks_checkbox = QCheckBox("Show peaks")
+        self.peaks_checkbox.setChecked(False)
+        self.peaks_checkbox.stateChanged.connect(self.on_checkbox_toggle)
+        left_panel.addWidget(self.peaks_checkbox)
+
         left_panel.addStretch()
 
         # Right panel with plot view
@@ -77,9 +85,13 @@ class SignalAnalyzer(QMainWindow):
 
         self.data = None
         self.file_path = None
-        self.x = None
-        self.y1 = None
-        self.y2 = None
+        self.i = None # Signal row index
+        self.signal_1 = None
+        self.signal_2 = None
+        self.plotting_start_index = 0
+        self.plotting_end_index = None
+        self.signal_1_peaks = np.array([])
+        self.signal_2_peaks = np.array([])
 
     def load_data(self):
         start_dir = os.path.expanduser("~/Documents")
@@ -98,7 +110,7 @@ class SignalAnalyzer(QMainWindow):
         self.file_path = file_path
         file_name = os.path.basename(file_path)
         self.file_label.setText(f"Selected file: {file_name}")
-        print("Loaded file:", file_path)
+        print("Loading file:", file_path)
 
         try:
             self.data = pd.read_csv(file_path, low_memory=True)
@@ -117,33 +129,61 @@ class SignalAnalyzer(QMainWindow):
 
             print(f"File loaded!!! Size: {file_size_str}, rows {num_points}, duration: {signal_time_str}")
 
-            # x = x axis in array format
-            # y1 = y axis of signal 1, y2 = y axis of signal 2
-            self.x = np.arange(len(self.data))
-            self.y1 = self.data["adc1"].values if "adc1" in self.data.columns else None
-            self.y2 = self.data["adc2"].values if "adc2" in self.data.columns else None
+            self.plotting_end_index = len(self.data)
+
+            self.i = np.arange(len(self.data))
+            self.signal_1 = self.data["adc1"].values if "adc1" in self.data.columns else None
+            self.signal_2 = self.data["adc2"].values if "adc2" in self.data.columns else None
+
+            # Computing peaks after data is loaded
+            self.signal_1_peaks = self.find_peaks(self.signal_1)
+            self.signal_2_peaks = self.find_peaks(self.signal_2)
+            print("Peaks found!")
+            print("Number of peaks in signal 1:", len(self.signal_1_peaks))
+            print("Number of peaks in signal 2:", len(self.signal_2_peaks))
 
         except Exception as e:
             print("Error loading file:", e)
+
+    def get_plotting_range(self):
+        start_index = self.plotting_start_index
+        end_index = self.plotting_end_index
+        x_range = self.i[start_index:end_index]
+        y1_range = self.signal_1[start_index:end_index] if self.signal_1 is not None else None
+        y2_range = self.signal_2[start_index:end_index] if self.signal_2 is not None else None
+        return x_range, y1_range, y2_range, start_index, end_index
+
+    def plot_current_range(self):
+        self.plot_signals(*self.get_plotting_range())
 
     def plot_data(self):
         if self.data is None:
             print("Load a data file first before plotting")
             return
 
-        self.plot_signals(self.x, self.y1, self.y2)
+        self.plot_current_range()
 
-    def plot_signals(self, x, y1, y2):
+    def plot_signals(self, row_indexes, signal_1, signal_2, plotting_start_index, plotting_end_index):
         self.figure.clear()
         ax = self.figure.add_subplot(111)
 
-        if y1 is not None:
-            x_down, y_down = self.minmax_downsample(x, y1)
+        if signal_1 is not None:
+            x_down, y_down = self.minmax_downsample(row_indexes, signal_1)
             ax.plot(x_down, y_down, label='Signal 1', linewidth=0.8)
 
-        if y2 is not None:
-            x_down, y_down = self.minmax_downsample(x, y2)
+            if self.peaks_checkbox.isChecked():
+                peaks_in_range = self.signal_1_peaks[(self.signal_1_peaks >= plotting_start_index) & (self.signal_1_peaks < plotting_end_index)]
+                if len(peaks_in_range) > 0:
+                    ax.plot(self.i[peaks_in_range], self.signal_1[peaks_in_range], "ro", label="Signal 1 peaks")
+
+        if signal_2 is not None:
+            x_down, y_down = self.minmax_downsample(row_indexes, signal_2)
             ax.plot(x_down, y_down, label='Signal 2', linewidth=0.8, alpha=0.9)
+
+            if self.peaks_checkbox.isChecked():
+                peaks_in_range = self.signal_2_peaks[(self.signal_2_peaks >= plotting_start_index) & (self.signal_2_peaks < plotting_end_index)]
+                if len(peaks_in_range) > 0:
+                    ax.plot(self.i[peaks_in_range], self.signal_2[peaks_in_range], "go", label="Signal 2 peaks")
 
         ax.set_title("Signal data")
         ax.set_xlabel("Time")
@@ -157,18 +197,36 @@ class SignalAnalyzer(QMainWindow):
         start, end = values
         self.slider_label.setText(f"Range: {start}% – {end}%")
 
-        if self.data is not None and self.x is not None:
-            total_data_points = len(self.x)
-            start_x_index = int(start / 100 * total_data_points)
-            end_x_index = int(end / 100 * total_data_points)
-            if start_x_index < end_x_index:
-                self.update_plot_range(start_x_index, end_x_index)
+        if self.data is not None and self.i is not None:
+            total_data_points = len(self.i)
+            self.plotting_start_index = int(start / 100 * total_data_points)
+            self.plotting_end_index = int(end / 100 * total_data_points)
+            if self.plotting_start_index < self.plotting_end_index:
+                self.plot_current_range()
 
     def update_plot_range(self, start_ind_x, end_ind_x):
-        x_range = self.x[start_ind_x:end_ind_x]
-        y1_range = self.y1[start_ind_x:end_ind_x] if self.y1 is not None else None
-        y2_range = self.y2[start_ind_x:end_ind_x] if self.y2 is not None else None
-        self.plot_signals(x_range, y1_range, y2_range)
+        x_range = self.i[start_ind_x:end_ind_x]
+        y1_range = self.signal_1[start_ind_x:end_ind_x] if self.signal_1 is not None else None
+        y2_range = self.signal_2[start_ind_x:end_ind_x] if self.signal_2 is not None else None
+        self.plot_signals(x_range, y1_range, y2_range, start_ind_x, end_ind_x)
+
+    def on_checkbox_toggle(self, state):
+        if self.data is not None:
+            self.plot_current_range()
+
+    def find_peaks(self, x):
+        try:
+            peaks, _ = scipy_find_peaks(
+                # These parameters need to be tweaked to show peaks more accurately
+                x,
+                height = 700,
+                distance = 10000,
+                prominence = 150
+            )
+            return peaks
+        except Exception as e:
+            print("Error finding peaks:", e)
+            return np.array([])
 
     def minmax_downsample(self, x, y, n_bins=None):
         N = len(y)
