@@ -92,6 +92,8 @@ class SignalAnalyzer(QMainWindow):
         self.plotting_end_index = None
         self.signal_1_peaks = np.array([])
         self.signal_2_peaks = np.array([])
+        self.time = None # Time on x axis on the plot
+        self.sampling_rate = 50000
 
     def load_data(self):
         start_dir = os.path.expanduser("~/Documents")
@@ -130,8 +132,9 @@ class SignalAnalyzer(QMainWindow):
             print(f"File loaded!!! Size: {file_size_str}, rows {num_points}, duration: {signal_time_str}")
 
             self.plotting_end_index = len(self.data)
-
             self.i = np.arange(len(self.data))
+            self.time = self.i / self.sampling_rate
+
             self.signal_1 = self.data["adc1"].values if "adc1" in self.data.columns else None
             self.signal_2 = self.data["adc2"].values if "adc2" in self.data.columns else None
 
@@ -168,25 +171,27 @@ class SignalAnalyzer(QMainWindow):
         ax = self.figure.add_subplot(111)
 
         if signal_1 is not None:
-            x_down, y_down = self.minmax_downsample(row_indexes, signal_1)
+            time_range = self.time[plotting_start_index:plotting_end_index]
+            x_down, y_down = self.minmax_downsample(time_range, signal_1)
             ax.plot(x_down, y_down, label='Signal 1', linewidth=0.8)
 
             if self.peaks_checkbox.isChecked():
                 peaks_in_range = self.signal_1_peaks[(self.signal_1_peaks >= plotting_start_index) & (self.signal_1_peaks < plotting_end_index)]
                 if len(peaks_in_range) > 0:
-                    ax.plot(self.i[peaks_in_range], self.signal_1[peaks_in_range], "ro", label="Signal 1 peaks")
+                    ax.plot(self.time[peaks_in_range], self.signal_1[peaks_in_range], "ro", label="Signal 1 peaks")
 
         if signal_2 is not None:
-            x_down, y_down = self.minmax_downsample(row_indexes, signal_2)
+            time_range = self.time[plotting_start_index:plotting_end_index]
+            x_down, y_down = self.minmax_downsample(time_range, signal_2)
             ax.plot(x_down, y_down, label='Signal 2', linewidth=0.8, alpha=0.9)
 
             if self.peaks_checkbox.isChecked():
                 peaks_in_range = self.signal_2_peaks[(self.signal_2_peaks >= plotting_start_index) & (self.signal_2_peaks < plotting_end_index)]
                 if len(peaks_in_range) > 0:
-                    ax.plot(self.i[peaks_in_range], self.signal_2[peaks_in_range], "go", label="Signal 2 peaks")
+                    ax.plot(self.time[peaks_in_range], self.signal_2[peaks_in_range], "go", label="Signal 2 peaks")
 
         ax.set_title("Signal data")
-        ax.set_xlabel("Time")
+        ax.set_xlabel("Time (seconds)")
         ax.set_ylabel("Response")
         ax.legend()
 
