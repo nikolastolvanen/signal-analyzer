@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QLabel,
     QCheckBox
 )
+from fontTools.misc.plistlib import start_dict
 from matplotlib.backends.backend_qt5agg import (
     FigureCanvasQTAgg as FigureCanvas,
     NavigationToolbar2QT as NavigationToolbar
@@ -26,8 +27,11 @@ class SignalAnalyzer(QMainWindow):
         # Toolbar on top
         menu_bar = self.menuBar()
         file_menu = menu_bar.addMenu("File")
-        open_action = file_menu.addAction("Open")
+        open_action = file_menu.addAction("Open file")
         open_action.triggered.connect(self.load_data)
+        convert_action = file_menu.addAction("Convert a file to .bin format")
+        convert_action.triggered.connect(self.convert_file_to_bin)
+
         exit_action = file_menu.addAction("Exit")
         exit_action.triggered.connect(self.close)
 
@@ -97,7 +101,7 @@ class SignalAnalyzer(QMainWindow):
         self.plotting_end_index = None
         self.signal_1_peaks = np.array([])
         self.signal_2_peaks = np.array([])
-        self.time = None # Time on x axis on the plot
+        self.time = None # Time on x-axis on the plot
         self.sampling_rate = 50000
 
     def load_data(self):
@@ -120,30 +124,43 @@ class SignalAnalyzer(QMainWindow):
         print("Loading file:", file_path)
 
         try:
-            self.data = pd.read_csv(file_path, low_memory=True)
-
-            # Get file size and data points and signal duration
+            file_type = os.path.splitext(file_path)[1].lower()
             file_size = os.path.getsize(file_path)
             file_size_str = self.format_size(file_size)
-            num_points = len(self.data)
-            signal_time_sec = num_points / 50000
+
+            if file_type == ".csv":
+
+                self.data = pd.read_csv(file_path, low_memory=True)
+                number_of_points = len(self.data)
+                self.signal_1 = self.data["adc1"].values
+                self.signal_2 = self.data["adc2"].values
+
+            elif file_type == ".bin":
+
+                number_of_samples = file_size // (2 * np.dtype(np.int16).itemsize)
+                raw_data = np.memmap(file_path, dtype=np.int16, mode="r", shape=(number_of_samples, 2))
+                self.signal_1 = raw_data[:, 0]
+                self.signal_2 = raw_data[:, 1]
+                number_of_points = len(raw_data)
+                self.data = pd.DataFrame({"adc1": self.signal_1, "adc2": self.signal_2})
+
+            else:
+                print("This file type is not supported.")
+                return
+
+            print("File loaded!!!")
+
+            signal_time_sec = number_of_points / self.sampling_rate
             signal_time_str = self.format_time(signal_time_sec)
 
-            # Set file size and data points and signal duration
             self.file_size_label.setText(f"File size: {file_size_str}")
-            self.data_points_label.setText(f"Data points: {num_points:,}")
+            self.data_points_label.setText(f"Data points: {number_of_points:,}")
             self.signal_time_label.setText(f"Signal duration: {signal_time_str}")
-
-            print(f"File loaded!!! Size: {file_size_str}, rows {num_points}, duration: {signal_time_str}")
 
             self.plotting_end_index = len(self.data)
             self.i = np.arange(len(self.data))
             self.time = self.i / self.sampling_rate
 
-            self.signal_1 = self.data["adc1"].values if "adc1" in self.data.columns else None
-            self.signal_2 = self.data["adc2"].values if "adc2" in self.data.columns else None
-
-            # Computing peaks after data is loaded
             self.signal_1_peaks = self.find_peaks(self.signal_1)
             self.signal_2_peaks = self.find_peaks(self.signal_2)
             print("Peaks found!")
@@ -152,6 +169,44 @@ class SignalAnalyzer(QMainWindow):
 
         except Exception as e:
             print("Error loading file:", e)
+
+    def convert_file_to_bin(self):
+        start_dir = os.path.expanduser("~/Documents")
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select a file to convert",
+            start_dir,
+            "All files (*)"
+        )
+
+        if not file_path:
+            print("No file selected.")
+            return
+
+        try:
+            print("Converting csv to bin")
+
+            df = pd.read_csv(file_path, low_memory=True)
+
+            signal_1 = np.asarray(df["adc1"], dtype=np.int16)
+            signal_2 = np.asarray(df["adc2"], dtype=np.int16)
+            interleaved = np.column_stack((signal_1, signal_2))
+
+            save_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Save as .bin",
+                os.path.splitext(file_path)[0] + ".bin",
+                "Binary files (*.bin)"
+            )
+            if not save_path:
+                print("Save cancelled.")
+                return
+
+            interleaved.tofile(save_path)
+            print("File converted!")
+
+        except Exception as e:
+            print("Error during conversion:", e)
 
     def get_plotting_range(self):
         start_index = self.plotting_start_index
