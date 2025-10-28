@@ -14,9 +14,9 @@ from matplotlib.backends.backend_qt5agg import (
 from matplotlib.figure import Figure
 from qtpy.QtCore import Qt
 from superqt import QRangeSlider
-from scipy.signal import find_peaks as scipy_find_peaks
 from formatters import format_size, format_time
 from algorithms import find_peaks, minmax_downsample
+from converter import csv_to_bin
 
 
 class SignalAnalyzer(QMainWindow):
@@ -185,14 +185,6 @@ class SignalAnalyzer(QMainWindow):
             return
 
         try:
-            print("Converting csv to bin")
-
-            df = pd.read_csv(file_path, low_memory=True)
-
-            signal_1 = np.asarray(df["adc1"], dtype=np.int16)
-            signal_2 = np.asarray(df["adc2"], dtype=np.int16)
-            interleaved = np.column_stack((signal_1, signal_2))
-
             save_path, _ = QFileDialog.getSaveFileName(
                 self,
                 "Save as .bin",
@@ -203,8 +195,8 @@ class SignalAnalyzer(QMainWindow):
                 print("Save cancelled.")
                 return
 
-            interleaved.tofile(save_path)
-            print("File converted!")
+            saved_file = csv_to_bin(file_path, save_path)
+            print(f"File converted and saved to: {saved_file}")
 
         except Exception as e:
             print("Error during conversion:", e)
