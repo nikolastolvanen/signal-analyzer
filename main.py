@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QLabel,
     QCheckBox
 )
-from fontTools.misc.plistlib import start_dict
 from matplotlib.backends.backend_qt5agg import (
     FigureCanvasQTAgg as FigureCanvas,
     NavigationToolbar2QT as NavigationToolbar
@@ -16,6 +15,7 @@ from matplotlib.figure import Figure
 from qtpy.QtCore import Qt
 from superqt import QRangeSlider
 from scipy.signal import find_peaks as scipy_find_peaks
+from formatters import format_size, format_time
 
 
 class SignalAnalyzer(QMainWindow):
@@ -126,7 +126,7 @@ class SignalAnalyzer(QMainWindow):
         try:
             file_type = os.path.splitext(file_path)[1].lower()
             file_size = os.path.getsize(file_path)
-            file_size_str = self.format_size(file_size)
+            file_size_str = format_size(file_size)
 
             if file_type == ".csv":
 
@@ -151,7 +151,7 @@ class SignalAnalyzer(QMainWindow):
             print("File loaded!!!")
 
             signal_time_sec = number_of_points / self.sampling_rate
-            signal_time_str = self.format_time(signal_time_sec)
+            signal_time_str = format_time(signal_time_sec)
 
             self.file_size_label.setText(f"File size: {file_size_str}")
             self.data_points_label.setText(f"Data points: {number_of_points:,}")
@@ -329,31 +329,6 @@ class SignalAnalyzer(QMainWindow):
         y_minmax[1::2] = y_max
 
         return x_minmax, y_minmax
-
-    def format_size(self, size_bytes):
-        # This function formats the file size to look good
-        if size_bytes < 1024:
-            return f"{size_bytes} B"
-        elif size_bytes < 1024**2:
-            return f"{size_bytes / 1024:.1f} KB"
-        elif size_bytes < 1024**3:
-            return f"{size_bytes / (1024**2):.1f} MB"
-        else:
-            return f"{size_bytes / (1024**3):.1f} GB"
-
-    def format_time(self, seconds):
-        # This function formats the signal duration time to easy to understand format
-        if seconds < 1:
-            return f"{seconds * 1000:.1f} ms"
-        elif seconds < 60:
-            return f"{seconds:.2f} s"
-        elif seconds < 3600:
-            m, s = divmod(seconds, 60)
-            return f"{int(m)} min {s:.1f} s"
-        else:
-            h, rem = divmod(seconds, 3600)
-            m, s = divmod(rem, 60)
-            return f"{int(h)} h {int(m)} min"
 
 
 if __name__ == "__main__":
