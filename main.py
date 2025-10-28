@@ -16,6 +16,7 @@ from qtpy.QtCore import Qt
 from superqt import QRangeSlider
 from scipy.signal import find_peaks as scipy_find_peaks
 from formatters import format_size, format_time
+from algorithms import find_peaks, minmax_downsample
 
 
 class SignalAnalyzer(QMainWindow):
@@ -161,8 +162,8 @@ class SignalAnalyzer(QMainWindow):
             self.i = np.arange(len(self.data))
             self.time = self.i / self.sampling_rate
 
-            self.signal_1_peaks = self.find_peaks(self.signal_1)
-            self.signal_2_peaks = self.find_peaks(self.signal_2)
+            self.signal_1_peaks = find_peaks(self.signal_1)
+            self.signal_2_peaks = find_peaks(self.signal_2)
             print("Peaks found!")
             print("Number of peaks in signal 1:", len(self.signal_1_peaks))
             print("Number of peaks in signal 2:", len(self.signal_2_peaks))
@@ -232,7 +233,7 @@ class SignalAnalyzer(QMainWindow):
 
         if signal_1 is not None:
             time_range = self.time[plotting_start_index:plotting_end_index]
-            x_down, y_down = self.minmax_downsample(time_range, signal_1)
+            x_down, y_down = minmax_downsample(time_range, signal_1, canvas_width=self.canvas.width())
             ax.plot(x_down, y_down, label='Signal 1', linewidth=0.8)
 
             if self.peaks_checkbox.isChecked():
@@ -242,7 +243,7 @@ class SignalAnalyzer(QMainWindow):
 
         if signal_2 is not None:
             time_range = self.time[plotting_start_index:plotting_end_index]
-            x_down, y_down = self.minmax_downsample(time_range, signal_2)
+            x_down, y_down = minmax_downsample(time_range, signal_2, canvas_width=self.canvas.width())
             ax.plot(x_down, y_down, label='Signal 2', linewidth=0.8, alpha=0.9)
 
             if self.peaks_checkbox.isChecked():
@@ -288,47 +289,6 @@ class SignalAnalyzer(QMainWindow):
     def on_checkbox_toggle(self, state):
         if self.data is not None:
             self.plot_current_range()
-
-    def find_peaks(self, x):
-        try:
-            peaks, _ = scipy_find_peaks(
-                # These parameters need to be tweaked to show peaks more accurately
-                x,
-                height = 700,
-                distance = 10000,
-                prominence = 150
-            )
-            return peaks
-        except Exception as e:
-            print("Error finding peaks:", e)
-            return np.array([])
-
-    def minmax_downsample(self, x, y, n_bins=None):
-        N = len(y)
-
-        if N <= 2000:
-            return x, y
-
-        if n_bins is None:
-            n_bins = max(self.canvas.width(), 2000)
-
-        bins = np.linspace(0, N, n_bins + 1, dtype=int)
-        y_min = np.minimum.reduceat(y, bins[:-1])
-        y_max = np.maximum.reduceat(y, bins[:-1])
-        x_mid = x[(bins[:-1] + bins[1:]) // 2]
-
-        # print("Bins:", len(bins))
-
-        out_len = 2 * len(x_mid)
-        x_minmax = np.empty(out_len, dtype=x.dtype)
-        y_minmax = np.empty(out_len, dtype=y.dtype)
-
-        x_minmax[0::2] = x_mid
-        x_minmax[1::2] = x_mid
-        y_minmax[0::2] = y_min
-        y_minmax[1::2] = y_max
-
-        return x_minmax, y_minmax
 
 
 if __name__ == "__main__":
