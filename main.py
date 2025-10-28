@@ -2,108 +2,35 @@ import sys
 import os
 import pandas as pd
 import numpy as np
-from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QFileDialog,
-    QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QLabel,
-    QCheckBox
-)
-from matplotlib.backends.backend_qt5agg import (
-    FigureCanvasQTAgg as FigureCanvas,
-    NavigationToolbar2QT as NavigationToolbar
-)
-from matplotlib.figure import Figure
-from qtpy.QtCore import Qt
-from superqt import QRangeSlider
+from PySide6.QtWidgets import QApplication, QFileDialog
 from formatters import format_size, format_time
 from algorithms import find_peaks, minmax_downsample
 from converter import csv_to_bin
+from main_window import MainWindow
 
 
-class SignalAnalyzer(QMainWindow):
+class SignalAnalyzer(MainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Signal analyzer")
-        self.resize(1000, 600)
 
-        # Toolbar on top
-        menu_bar = self.menuBar()
-        file_menu = menu_bar.addMenu("File")
-        open_action = file_menu.addAction("Open file")
-        open_action.triggered.connect(self.load_data)
-        convert_action = file_menu.addAction("Convert a file to .bin format")
-        convert_action.triggered.connect(self.convert_file_to_bin)
-
-        exit_action = file_menu.addAction("Exit")
-        exit_action.triggered.connect(self.close)
-
-        # Main layout
-        main_layout = QHBoxLayout()
-        container = QWidget()
-        container.setLayout(main_layout)
-        self.setCentralWidget(container)
-
-        # Left panel with plot button and some file info and checkbox to show peaks
-        left_panel = QVBoxLayout()
-        main_layout.addLayout(left_panel, 1)
-
-        self.file_label = QLabel("Selected file: None")
-        left_panel.addWidget(self.file_label)
-
-        self.file_size_label = QLabel("File size: --")
-        left_panel.addWidget(self.file_size_label)
-
-        self.data_points_label = QLabel("Data points: --")
-        left_panel.addWidget(self.data_points_label)
-
-        self.signal_time_label = QLabel("Signal duration: --")
-        left_panel.addWidget(self.signal_time_label)
-
-        self.plot_button = QPushButton("Plot")
-        self.plot_button.clicked.connect(self.plot_data)
-        left_panel.addWidget(self.plot_button)
-
-        self.peaks_checkbox = QCheckBox("Show peaks")
-        self.peaks_checkbox.setChecked(False)
-        self.peaks_checkbox.stateChanged.connect(self.on_checkbox_toggle)
-        left_panel.addWidget(self.peaks_checkbox)
-
-        left_panel.addStretch()
-
-        # Right panel with plot view
-        right_panel = QVBoxLayout()
-        main_layout.addLayout(right_panel, 4)
-
-        self.figure = Figure(figsize=(8, 6))
-        self.canvas = FigureCanvas(self.figure)
-        self.toolbar = NavigationToolbar(self.canvas, self)
-        right_panel.addWidget(self.toolbar)
-        right_panel.addWidget(self.canvas)
-
-        self.range_slider = QRangeSlider(Qt.Horizontal)
-        self.range_slider.setRange(0, 100)
-        self.range_slider.setValue((0, 100))
-        self.range_slider.valueChanged.connect(self.on_slider_change)
-        right_panel.addWidget(self.range_slider)
-
-        self.slider_label = QLabel("Range: 0% – 100%")
-        right_panel.addWidget(self.slider_label)
-
-        self.range_button = QPushButton("Reset range")
-        self.range_button.setFixedSize(100, 30)
-        self.range_button.clicked.connect(self.reset_slider_range)
-        right_panel.addWidget(self.range_button)
-
-        self.data = None
+        self.i = None
         self.file_path = None
-        self.i = None # Signal row index
         self.signal_1 = None
         self.signal_2 = None
+        self.time = None
+        self.sampling_rate = 50000
         self.plotting_start_index = 0
         self.plotting_end_index = None
         self.signal_1_peaks = np.array([])
         self.signal_2_peaks = np.array([])
-        self.time = None # Time on x-axis on the plot
-        self.sampling_rate = 50000
+
+        self.open_action.triggered.connect(self.load_data)
+        self.convert_action.triggered.connect(self.convert_file_to_bin)
+        self.exit_action.triggered.connect(self.close)
+        self.plot_button.clicked.connect(self.plot_data)
+        self.peaks_checkbox.stateChanged.connect(self.on_checkbox_toggle)
+        self.range_slider.valueChanged.connect(self.on_slider_change)
+        self.range_button.clicked.connect(self.reset_slider_range)
 
     def load_data(self):
         start_dir = os.path.expanduser("~/Documents")
@@ -124,17 +51,18 @@ class SignalAnalyzer(QMainWindow):
         self.file_label.setText(f"Selected file: {file_name}")
         print("Loading file:", file_path)
 
+        file_type = os.path.splitext(file_path)[1].lower()
+        file_size = os.path.getsize(file_path)
+        file_size_str = format_size(file_size)
+
         try:
-            file_type = os.path.splitext(file_path)[1].lower()
-            file_size = os.path.getsize(file_path)
-            file_size_str = format_size(file_size)
 
             if file_type == ".csv":
 
-                self.data = pd.read_csv(file_path, low_memory=True)
-                number_of_points = len(self.data)
-                self.signal_1 = self.data["adc1"].values
-                self.signal_2 = self.data["adc2"].values
+                self.i = pd.read_csv(file_path, low_memory=True)
+                number_of_points = len(self.i)
+                self.signal_1 = self.i["adc1"].values
+                self.signal_2 = self.i["adc2"].values
 
             elif file_type == ".bin":
 
@@ -143,7 +71,7 @@ class SignalAnalyzer(QMainWindow):
                 self.signal_1 = raw_data[:, 0]
                 self.signal_2 = raw_data[:, 1]
                 number_of_points = len(raw_data)
-                self.data = pd.DataFrame({"adc1": self.signal_1, "adc2": self.signal_2})
+                self.i = pd.DataFrame({"adc1": self.signal_1, "adc2": self.signal_2})
 
             else:
                 print("This file type is not supported.")
@@ -158,8 +86,8 @@ class SignalAnalyzer(QMainWindow):
             self.data_points_label.setText(f"Data points: {number_of_points:,}")
             self.signal_time_label.setText(f"Signal duration: {signal_time_str}")
 
-            self.plotting_end_index = len(self.data)
-            self.i = np.arange(len(self.data))
+            self.plotting_end_index = len(self.i)
+            self.i = np.arange(len(self.i))
             self.time = self.i / self.sampling_rate
 
             self.signal_1_peaks = find_peaks(self.signal_1)
@@ -173,47 +101,38 @@ class SignalAnalyzer(QMainWindow):
 
     def convert_file_to_bin(self):
         start_dir = os.path.expanduser("~/Documents")
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Select a file to convert",
-            start_dir,
-            "All files (*)"
-        )
+        file_path, _ = QFileDialog.getOpenFileName(self,"Select a file", start_dir,"All files (*)")
 
         if not file_path:
             print("No file selected.")
             return
 
-        try:
-            save_path, _ = QFileDialog.getSaveFileName(
-                self,
-                "Save as .bin",
-                os.path.splitext(file_path)[0] + ".bin",
-                "Binary files (*.bin)"
-            )
-            if not save_path:
-                print("Save cancelled.")
-                return
+        save_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save as .bin",
+            os.path.splitext(file_path)[0] + ".bin",
+            "Binary files (*.bin)"
+        )
+        if not save_path:
+            print("Save cancelled.")
+            return
 
-            saved_file = csv_to_bin(file_path, save_path)
-            print(f"File converted and saved to: {saved_file}")
-
-        except Exception as e:
-            print("Error during conversion:", e)
+        saved_file = csv_to_bin(file_path, save_path)
+        print(f"File converted and saved to: {saved_file}")
 
     def get_plotting_range(self):
-        start_index = self.plotting_start_index
-        end_index = self.plotting_end_index
-        x_range = self.i[start_index:end_index]
-        y1_range = self.signal_1[start_index:end_index] if self.signal_1 is not None else None
-        y2_range = self.signal_2[start_index:end_index] if self.signal_2 is not None else None
-        return x_range, y1_range, y2_range, start_index, end_index
+        start = self.plotting_start_index
+        end = self.plotting_end_index
+        x_range = self.i[start:end]
+        y1_range = self.signal_1[start:end]
+        y2_range = self.signal_2[start:end]
+        return x_range, y1_range, y2_range, start, end
 
     def plot_current_range(self):
         self.plot_signals(*self.get_plotting_range())
 
     def plot_data(self):
-        if self.data is None:
+        if self.i is None:
             print("Load a data file first before plotting")
             return
 
@@ -251,11 +170,10 @@ class SignalAnalyzer(QMainWindow):
         self.canvas.draw()
 
     def on_slider_change(self, values):
-        # This function is called when the range slider is moved
         start, end = values
         self.slider_label.setText(f"Range: {start}% – {end}%")
 
-        if self.data is not None and self.i is not None:
+        if self.i is not None and self.i is not None:
             total_data_points = len(self.i)
             self.plotting_start_index = int(start / 100 * total_data_points)
             self.plotting_end_index = int(end / 100 * total_data_points)
@@ -263,7 +181,7 @@ class SignalAnalyzer(QMainWindow):
                 self.plot_current_range()
 
     def reset_slider_range(self):
-        if self.data is None:
+        if self.i is None:
             return
 
         self.range_slider.setValue((0, 100))
@@ -272,14 +190,8 @@ class SignalAnalyzer(QMainWindow):
         self.plotting_end_index = len(self.i)
         self.plot_current_range()
 
-    def update_plot_range(self, start_ind_x, end_ind_x):
-        x_range = self.i[start_ind_x:end_ind_x]
-        y1_range = self.signal_1[start_ind_x:end_ind_x] if self.signal_1 is not None else None
-        y2_range = self.signal_2[start_ind_x:end_ind_x] if self.signal_2 is not None else None
-        self.plot_signals(x_range, y1_range, y2_range, start_ind_x, end_ind_x)
-
-    def on_checkbox_toggle(self, state):
-        if self.data is not None:
+    def on_checkbox_toggle(self, _):
+        if self.i is not None:
             self.plot_current_range()
 
 
