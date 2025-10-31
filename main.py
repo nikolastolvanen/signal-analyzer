@@ -3,6 +3,8 @@ import os
 import pandas as pd
 import numpy as np
 from PySide6.QtWidgets import QApplication, QFileDialog
+from PySide6.QtCore import QThread
+from workers import PeakWorker
 from formatters import format_size, format_time
 from algorithms import find_peaks, minmax_downsample
 from converter import csv_to_bin
@@ -90,14 +92,30 @@ class SignalAnalyzer(MainWindow):
             self.i = np.arange(len(self.i))
             self.time = self.i / self.sampling_rate
 
-            self.signal_1_peaks = find_peaks(self.signal_1)
-            self.signal_2_peaks = find_peaks(self.signal_2)
-            print("Peaks found!")
-            print("Number of peaks in signal 1:", len(self.signal_1_peaks))
-            print("Number of peaks in signal 2:", len(self.signal_2_peaks))
+            # Peak detection
+            self.thread = QThread()
+            self.worker = PeakWorker(self.signal_1, self.signal_2)
+            self.worker.moveToThread(self.thread)
+            self.thread.started.connect(self.worker.run)
+            self.worker.finished.connect(self.on_peaks_detection_finished)
+            self.worker.error.connect(self.on_peaks_detection_error)
+            self.worker.finished.connect(self.thread.quit)
+            self.worker.finished.connect(self.worker.deleteLater)
+            self.thread.finished.connect(self.thread.deleteLater)
+
+            self.thread.start()
 
         except Exception as e:
             print("Error loading file:", e)
+
+    def on_peaks_detection_finished(self, peaks_1, peaks_2):
+        self.signal_1_peaks = peaks_1
+        self.signal_2_peaks = peaks_2
+        print("Number of peaks in signal 1:", len(peaks_1))
+        print("Number of peaks in signal 2:", len(peaks_2))
+
+    def on_peaks_detection_error(self, message):
+        print("Error detecting peaks:", message)
 
     def convert_file_to_bin(self):
         start_dir = os.path.expanduser("~/Documents")

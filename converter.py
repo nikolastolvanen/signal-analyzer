@@ -11,7 +11,7 @@ def csv_to_bin(file_path: str, save_path: str = None):
     df = pd.read_csv(file_path, low_memory=True)
 
     if "adc1" not in df.columns or "adc2" not in df.columns:
-        raise ValueError("CSV file must contain 'adc1' and 'adc2' columns.")
+        raise ValueError("The csv file should have columns 'adc1' and 'adc2'.")
 
     signal_1 = np.asarray(df["adc1"], dtype=np.int16)
     signal_2 = np.asarray(df["adc2"], dtype=np.int16)
