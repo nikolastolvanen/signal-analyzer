@@ -54,6 +54,10 @@ class MainWindow(QMainWindow):
         self.peaks_checkbox.setChecked(False)
         left_panel.addWidget(self.peaks_checkbox)
 
+        self.baseline_checkbox = QCheckBox("Show baseline")
+        self.baseline_checkbox.setChecked(False)
+        left_panel.addWidget(self.baseline_checkbox)
+
         left_panel.addStretch()
 
         right_panel = QVBoxLayout()

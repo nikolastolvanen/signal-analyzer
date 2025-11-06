@@ -2,16 +2,22 @@ import numpy as np
 from scipy.signal import find_peaks as scipy_find_peaks
 
 
+def compute_baseline(signal):
+    lower, upper = np.percentile(signal, [5, 95])
+    trimmed = signal[(signal >= lower) & (signal <= upper)]
+    return np.median(trimmed)
+
+
 def find_peaks(x: np.ndarray,
-               height: float = 700,
-               distance: int = 10000,
-               prominence: float = 150) -> np.ndarray:
+               baseline: float = None,
+               height: float = None,
+               distance: int = 20000,
+               prominence: float = 50) -> np.ndarray:
 
     try:
         peaks, _ = scipy_find_peaks(
             x,
-            # These parameters need to be tweaked to show peaks more accurately
-            height=height,
+            height=baseline + 30,
             distance=distance,
             prominence=prominence
         )

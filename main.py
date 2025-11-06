@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog
 from PySide6.QtCore import QThread
 from workers import PeakWorker
 from formatters import format_size, format_time
-from algorithms import find_peaks, minmax_downsample
+from algorithms import find_peaks, minmax_downsample, compute_baseline
 from converter import csv_to_bin
 from main_window import MainWindow
 
@@ -25,12 +25,15 @@ class SignalAnalyzer(MainWindow):
         self.plotting_end_index = None
         self.signal_1_peaks = np.array([])
         self.signal_2_peaks = np.array([])
+        self.baseline_1 = None
+        self.baseline_2 = None
 
         self.open_action.triggered.connect(self.load_data)
         self.convert_action.triggered.connect(self.convert_file_to_bin)
         self.exit_action.triggered.connect(self.close)
         self.plot_button.clicked.connect(self.plot_data)
         self.peaks_checkbox.stateChanged.connect(self.on_checkbox_toggle)
+        self.baseline_checkbox.stateChanged.connect(self.on_checkbox_toggle)
         self.range_slider.valueChanged.connect(self.on_slider_change)
         self.range_button.clicked.connect(self.reset_slider_range)
 
@@ -92,7 +95,6 @@ class SignalAnalyzer(MainWindow):
             self.i = np.arange(len(self.i))
             self.time = self.i / self.sampling_rate
 
-            # Peak detection
             self.thread = QThread()
             self.worker = PeakWorker(self.signal_1, self.signal_2)
             self.worker.moveToThread(self.thread)
@@ -108,11 +110,11 @@ class SignalAnalyzer(MainWindow):
         except Exception as e:
             print("Error loading file:", e)
 
-    def on_peaks_detection_finished(self, peaks_1, peaks_2):
+    def on_peaks_detection_finished(self, peaks_1, peaks_2, baseline_1, baseline_2):
         self.signal_1_peaks = peaks_1
         self.signal_2_peaks = peaks_2
-        print("Number of peaks in signal 1:", len(peaks_1))
-        print("Number of peaks in signal 2:", len(peaks_2))
+        self.baseline_1 = baseline_1
+        self.baseline_2 = baseline_2
 
     def on_peaks_detection_error(self, message):
         print("Error detecting peaks:", message)
@@ -165,6 +167,9 @@ class SignalAnalyzer(MainWindow):
             x_down, y_down = minmax_downsample(time_range, signal_1, canvas_width=self.canvas.width())
             ax.plot(x_down, y_down, label='Signal 1', linewidth=0.8)
 
+            if self.baseline_checkbox.isChecked() and self.baseline_1 is not None:
+                ax.axhline(y=self.baseline_1, color='orange', linestyle='--', linewidth=2, label='Baseline 1')
+
             if self.peaks_checkbox.isChecked():
                 peaks_in_range = self.signal_1_peaks[(self.signal_1_peaks >= plotting_start_index) & (self.signal_1_peaks < plotting_end_index)]
                 if len(peaks_in_range) > 0:
@@ -174,6 +179,9 @@ class SignalAnalyzer(MainWindow):
             time_range = self.time[plotting_start_index:plotting_end_index]
             x_down, y_down = minmax_downsample(time_range, signal_2, canvas_width=self.canvas.width())
             ax.plot(x_down, y_down, label='Signal 2', linewidth=0.8, alpha=0.9)
+
+            if self.baseline_checkbox.isChecked() and self.baseline_2 is not None:
+                ax.axhline(y=self.baseline_2, color='green', linestyle='--', linewidth=2, label='Baseline 2')
 
             if self.peaks_checkbox.isChecked():
                 peaks_in_range = self.signal_2_peaks[(self.signal_2_peaks >= plotting_start_index) & (self.signal_2_peaks < plotting_end_index)]
@@ -191,7 +199,7 @@ class SignalAnalyzer(MainWindow):
         start, end = values
         self.slider_label.setText(f"Range: {start}% – {end}%")
 
-        if self.i is not None and self.i is not None:
+        if self.i is not None:
             total_data_points = len(self.i)
             self.plotting_start_index = int(start / 100 * total_data_points)
             self.plotting_end_index = int(end / 100 * total_data_points)
