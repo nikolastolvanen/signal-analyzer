@@ -1,0 +1,16 @@
+QLabel {
+    font-size: 13px;
+}
+
+QLabel[role='title'] {
+    font-weight: bold;
+    font-size: 14px;
+    margin-bottom: 6px;
+}
+
+QPushButton {
+    background-color: #0078d7;
+    color: white;
+    border-radius: 4px;
+    padding: 5px 10px;
+}

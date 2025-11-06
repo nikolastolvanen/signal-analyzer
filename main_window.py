@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QCheckBox, QMenuBar, QMenu
+    QPushButton, QCheckBox, QMenuBar, QMenu, QFrame
 )
 from matplotlib.backends.backend_qt5agg import (
     FigureCanvasQTAgg as FigureCanvas,
@@ -35,6 +35,10 @@ class MainWindow(QMainWindow):
         left_panel = QVBoxLayout()
         main_layout.addLayout(left_panel, 1)
 
+        file_info_title = QLabel("File info")
+        file_info_title.setProperty("role", "title")
+        left_panel.addWidget(file_info_title)
+
         self.file_label = QLabel("Selected file: None")
         left_panel.addWidget(self.file_label)
 
@@ -47,8 +51,27 @@ class MainWindow(QMainWindow):
         self.signal_time_label = QLabel("Signal duration: --")
         left_panel.addWidget(self.signal_time_label)
 
-        self.plot_button = QPushButton("Plot")
-        left_panel.addWidget(self.plot_button)
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Sunken)
+        line.setStyleSheet("margin: 6px 0;")
+        left_panel.addWidget(line)
+
+        peaks_title = QLabel("Peaks")
+        peaks_title.setProperty("role", "title")
+        left_panel.addWidget(peaks_title)
+
+        self.peaks_1_count_label = QLabel("Signal 1 peaks: --")
+        left_panel.addWidget(self.peaks_1_count_label)
+
+        self.peaks_2_count_label = QLabel("Signal 2 peaks: --")
+        left_panel.addWidget(self.peaks_2_count_label)
+
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Sunken)
+        line.setStyleSheet("margin: 6px 0;")
+        left_panel.addWidget(line)
 
         self.peaks_checkbox = QCheckBox("Show peaks")
         self.peaks_checkbox.setChecked(False)

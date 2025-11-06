@@ -31,7 +31,6 @@ class SignalAnalyzer(MainWindow):
         self.open_action.triggered.connect(self.load_data)
         self.convert_action.triggered.connect(self.convert_file_to_bin)
         self.exit_action.triggered.connect(self.close)
-        self.plot_button.clicked.connect(self.plot_data)
         self.peaks_checkbox.stateChanged.connect(self.on_checkbox_toggle)
         self.baseline_checkbox.stateChanged.connect(self.on_checkbox_toggle)
         self.range_slider.valueChanged.connect(self.on_slider_change)
@@ -44,7 +43,7 @@ class SignalAnalyzer(MainWindow):
             self,
             "Open Data File",
             start_dir,
-            "All Files (*)"
+            "Binary files (*.bin)"
         )
 
         if not file_path:
@@ -95,6 +94,8 @@ class SignalAnalyzer(MainWindow):
             self.i = np.arange(len(self.i))
             self.time = self.i / self.sampling_rate
 
+            self.plot_data()
+
             self.thread = QThread()
             self.worker = PeakWorker(self.signal_1, self.signal_2)
             self.worker.moveToThread(self.thread)
@@ -115,6 +116,9 @@ class SignalAnalyzer(MainWindow):
         self.signal_2_peaks = peaks_2
         self.baseline_1 = baseline_1
         self.baseline_2 = baseline_2
+
+        self.peaks_1_count_label.setText(f"Signal 1 peaks: {len(peaks_1)}")
+        self.peaks_2_count_label.setText(f"Signal 2 peaks: {len(peaks_2)}")
 
     def on_peaks_detection_error(self, message):
         print("Error detecting peaks:", message)
@@ -223,6 +227,10 @@ class SignalAnalyzer(MainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+
+    with open("style.qss", "r") as f:
+        app.setStyleSheet(f.read())
+
     window = SignalAnalyzer()
     window.show()
     sys.exit(app.exec())
