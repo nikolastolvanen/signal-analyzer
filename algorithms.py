@@ -11,13 +11,13 @@ def compute_baseline(signal):
 def find_peaks(x: np.ndarray,
                baseline: float = None,
                height: float = None,
-               distance: int = 20000,
-               prominence: float = 50) -> np.ndarray:
+               distance: int = 9000,
+               prominence: float = 30) -> np.ndarray:
 
     try:
         peaks, _ = scipy_find_peaks(
             x,
-            height=baseline + 30,
+            height=baseline + 13,
             distance=distance,
             prominence=prominence
         )
