@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog
 from PySide6.QtCore import QThread
 from workers import PeakWorker
 from formatters import format_size, format_time
-from algorithms import find_peaks, minmax_downsample, compute_baseline
+from algorithms import minmax_downsample
 from converter import csv_to_bin
 from main_window import MainWindow
 
@@ -15,6 +15,8 @@ class SignalAnalyzer(MainWindow):
     def __init__(self):
         super().__init__()
 
+        self.worker = None
+        self.thread = None
         self.i = None
         self.file_path = None
         self.signal_1 = None
@@ -23,8 +25,10 @@ class SignalAnalyzer(MainWindow):
         self.sampling_rate = 50000
         self.plotting_start_index = 0
         self.plotting_end_index = None
-        self.signal_1_peaks = np.array([])
-        self.signal_2_peaks = np.array([])
+        self.s1_tumor_peaks = np.array([])
+        self.s2_tumor_peaks = np.array([])
+        self.s1_water_peaks = np.array([])
+        self.s2_water_peaks = np.array([])
         self.baseline_1 = None
         self.baseline_2 = None
 
@@ -81,7 +85,7 @@ class SignalAnalyzer(MainWindow):
                 print("This file type is not supported.")
                 return
 
-            print("File loaded!!!")
+            print("File loaded!")
 
             signal_time_sec = number_of_points / self.sampling_rate
             signal_time_str = format_time(signal_time_sec)
@@ -111,16 +115,19 @@ class SignalAnalyzer(MainWindow):
         except Exception as e:
             print("Error loading file:", e)
 
-    def on_peaks_detection_finished(self, peaks_1, peaks_2, baseline_1, baseline_2):
-        self.signal_1_peaks = peaks_1
-        self.signal_2_peaks = peaks_2
+    def on_peaks_detection_finished(self, tumor_peaks_1, tumor_peaks_2, water_peaks_1, water_peaks_2, baseline_1, baseline_2):
+        self.s1_tumor_peaks = tumor_peaks_1
+        self.s2_tumor_peaks = tumor_peaks_2
+        self.s1_water_peaks = water_peaks_1
+        self.s2_water_peaks = water_peaks_2
         self.baseline_1 = baseline_1
         self.baseline_2 = baseline_2
 
-        self.peaks_1_count_label.setText(f"Signal 1 peaks: {len(peaks_1)}")
-        self.peaks_2_count_label.setText(f"Signal 2 peaks: {len(peaks_2)}")
+        self.peaks_1_count_label.setText(f"Signal 1 tumor peaks: {len(tumor_peaks_1)}")
+        self.peaks_2_count_label.setText(f"Signal 2 tumor peaks: {len(tumor_peaks_2)}")
 
-    def on_peaks_detection_error(self, message):
+    @staticmethod
+    def on_peaks_detection_error(message):
         print("Error detecting peaks:", message)
 
     def convert_file_to_bin(self):
@@ -175,9 +182,13 @@ class SignalAnalyzer(MainWindow):
                 ax.axhline(y=self.baseline_1, color='orange', linestyle='--', linewidth=2, label='Baseline 1')
 
             if self.peaks_checkbox.isChecked():
-                peaks_in_range = self.signal_1_peaks[(self.signal_1_peaks >= plotting_start_index) & (self.signal_1_peaks < plotting_end_index)]
-                if len(peaks_in_range) > 0:
-                    ax.plot(self.time[peaks_in_range], self.signal_1[peaks_in_range], "ro", label="Signal 1 peaks")
+                tumor_peaks_in_range = self.s1_tumor_peaks[(self.s1_tumor_peaks >= plotting_start_index) & (self.s1_tumor_peaks < plotting_end_index)]
+                if len(tumor_peaks_in_range) > 0:
+                    ax.plot(self.time[tumor_peaks_in_range], self.signal_1[tumor_peaks_in_range], color='red', marker='o', linestyle='None', label="Signal 1 tumor peaks")
+
+                water_peaks_in_range = self.s1_water_peaks[(self.s1_water_peaks >= plotting_start_index) & (self.s1_water_peaks < plotting_end_index)]
+                if len(water_peaks_in_range) > 0:
+                    ax.plot(self.time[water_peaks_in_range], self.signal_1[water_peaks_in_range], color='black', marker='o', linestyle='None', label="Signal 1 water peaks")
 
         if signal_2 is not None:
             time_range = self.time[plotting_start_index:plotting_end_index]
@@ -188,9 +199,17 @@ class SignalAnalyzer(MainWindow):
                 ax.axhline(y=self.baseline_2, color='green', linestyle='--', linewidth=2, label='Baseline 2')
 
             if self.peaks_checkbox.isChecked():
-                peaks_in_range = self.signal_2_peaks[(self.signal_2_peaks >= plotting_start_index) & (self.signal_2_peaks < plotting_end_index)]
-                if len(peaks_in_range) > 0:
-                    ax.plot(self.time[peaks_in_range], self.signal_2[peaks_in_range], "go", label="Signal 2 peaks")
+                tumor_peaks_in_range = self.s2_tumor_peaks[
+                    (self.s2_tumor_peaks >= plotting_start_index) & (self.s2_tumor_peaks < plotting_end_index)]
+                if len(tumor_peaks_in_range) > 0:
+                    ax.plot(self.time[tumor_peaks_in_range], self.signal_2[tumor_peaks_in_range], color='green', marker='o', linestyle='None',
+                            label="Signal 2 tumor peaks")
+
+                water_peaks_in_range = self.s2_water_peaks[
+                    (self.s2_water_peaks >= plotting_start_index) & (self.s2_water_peaks < plotting_end_index)]
+                if len(water_peaks_in_range) > 0:
+                    ax.plot(self.time[water_peaks_in_range], self.signal_2[water_peaks_in_range], color='blue', marker='o', linestyle='None',
+                            label="Signal 2 water peaks")
 
         ax.set_title("Signal data")
         ax.set_xlabel("Time (seconds)")
@@ -228,8 +247,8 @@ class SignalAnalyzer(MainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
-    with open("style.qss", "r") as f:
-        app.setStyleSheet(f.read())
+    with open("style.qss", "r") as file:
+        app.setStyleSheet(file.read())
 
     window = SignalAnalyzer()
     window.show()

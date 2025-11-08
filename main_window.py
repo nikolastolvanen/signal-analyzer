@@ -61,10 +61,10 @@ class MainWindow(QMainWindow):
         peaks_title.setProperty("role", "title")
         left_panel.addWidget(peaks_title)
 
-        self.peaks_1_count_label = QLabel("Signal 1 peaks: --")
+        self.peaks_1_count_label = QLabel("Signal 1 tumor peaks: --")
         left_panel.addWidget(self.peaks_1_count_label)
 
-        self.peaks_2_count_label = QLabel("Signal 2 peaks: --")
+        self.peaks_2_count_label = QLabel("Signal 2 tumor peaks: --")
         left_panel.addWidget(self.peaks_2_count_label)
 
         line = QFrame()

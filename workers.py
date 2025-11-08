@@ -3,7 +3,7 @@ import numpy as np
 from algorithms import find_peaks, compute_baseline
 
 class PeakWorker(QObject):
-    finished = Signal(np.ndarray, np.ndarray, float, float)
+    finished = Signal(np.ndarray, np.ndarray, np.ndarray, np.ndarray, float, float)
     error = Signal(str)
 
     def __init__(self, signal_1: np.ndarray, signal_2: np.ndarray):
@@ -20,11 +20,11 @@ class PeakWorker(QObject):
             print("Baseline computation finished.")
 
             print("Peak detection started.")
-            peaks_1 = find_peaks(self.signal_1, baseline_1)
-            peaks_2 = find_peaks(self.signal_2, baseline_2)
+            tumor_peaks_1, water_peaks_1 = find_peaks(self.signal_1, baseline_1)
+            tumor_peaks_2, water_peaks_2 = find_peaks(self.signal_2, baseline_2)
             print("Peak detection finished.")
 
-            self.finished.emit(peaks_1, peaks_2, baseline_1, baseline_2)
+            self.finished.emit(tumor_peaks_1, tumor_peaks_2, water_peaks_1, water_peaks_2, baseline_1, baseline_2)
 
         except Exception as e:
             self.error.emit(str(e))
