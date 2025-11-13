@@ -77,6 +77,10 @@ class MainWindow(QMainWindow):
         self.peaks_checkbox.setChecked(False)
         left_panel.addWidget(self.peaks_checkbox)
 
+        self.water_checkbox = QCheckBox("Show water")
+        self.water_checkbox.setChecked(False)
+        left_panel.addWidget(self.water_checkbox)
+
         self.baseline_checkbox = QCheckBox("Show baseline")
         self.baseline_checkbox.setChecked(False)
         left_panel.addWidget(self.baseline_checkbox)

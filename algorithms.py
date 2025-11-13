@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.signal import find_peaks as scipy_find_peaks
+from scipy.signal import find_peaks as scipy_find_peaks, peak_widths
 
 
 def compute_baseline(signal):
@@ -10,23 +10,33 @@ def compute_baseline(signal):
 
 def find_peaks(x: np.ndarray,
                baseline: float = None,
-               distance: int = 9000,
-               prominence: float = 30,
-               local_dist: int = 4500) -> tuple[np.ndarray, np.ndarray]:
+               section_sd: float = None,
+               section_mean: float = None,
+               signal_total_sd: float = None,
+               distance: int = 8000,
+               prominence: float = 25,
+               local_dist: int = 20000) -> tuple[np.ndarray, np.ndarray, float]:
 
 
     try:
         peaks, properties = scipy_find_peaks(
             x,
-            height=baseline + 13,
+            height=baseline + signal_total_sd,
             distance=distance,
             prominence=prominence
         )
 
+        peak_heights = properties.get("peak_heights", x[peaks])
+        peak_widths = properties.get("peak_widths", x[peaks])
+
         tumor_peaks = []
         water_peaks = []
+        total_peak_size = 0
 
         for i, peak_index in enumerate(peaks):
+            peak_height = peak_heights[i]
+            peak_width = peak_widths[i]
+            peak_size = peak_height * peak_width * 0.5
 
             start = max(0, peak_index - local_dist)
             end = min(len(x), peak_index + local_dist)
@@ -34,12 +44,13 @@ def find_peaks(x: np.ndarray,
 
             local_min = min(local_area)
 
-            if local_min < baseline - 15:
+            if (local_min < baseline - 2*signal_total_sd) and (peak_height < baseline + 9*signal_total_sd):
                 water_peaks.append(peak_index)
             else:
                 tumor_peaks.append(peak_index)
+                total_peak_size += peak_size
 
-        return np.array(tumor_peaks), np.array(water_peaks)
+        return np.array(tumor_peaks), np.array(water_peaks), total_peak_size
 
     except Exception as e:
         print("Error finding peaks:", e)
