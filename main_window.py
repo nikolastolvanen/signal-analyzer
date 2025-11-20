@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QCheckBox, QMenuBar, QMenu, QFrame
+    QPushButton, QCheckBox, QMenuBar, QMenu, QFrame, QProgressBar
 )
 from matplotlib.backends.backend_qt5agg import (
     FigureCanvasQTAgg as FigureCanvas,
@@ -86,6 +86,16 @@ class MainWindow(QMainWindow):
         left_panel.addWidget(self.baseline_checkbox)
 
         left_panel.addStretch()
+
+        self.status_label = QLabel("Status: idle")
+        left_panel.addWidget(self.status_label)
+
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setTextVisible(True)
+        self.progress_bar.hide()
+        left_panel.addWidget(self.progress_bar)
 
         right_panel = QVBoxLayout()
         main_layout.addLayout(right_panel, 4)

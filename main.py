@@ -41,6 +41,28 @@ class SignalAnalyzer(MainWindow):
         self.range_slider.valueChanged.connect(self.on_slider_change)
         self.range_button.clicked.connect(self.reset_slider_range)
 
+    def show_progress_busy(self, text):
+        self.status_label.setText(text)
+        self.progress_bar.setRange(0, 0)
+        self.progress_bar.show()
+
+    def update_progress(self, value, text=None):
+        if self.progress_bar.minimum() == 0 and self.progress_bar.maximum() == 0:
+            self.progress_bar.setRange(0, 100)
+
+        self.progress_bar.setValue(value)
+        if text is not None:
+            self.status_label.setText(text)
+
+    def hide_progress(self, final_text="Status: idle"):
+        self.progress_bar.hide()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.status_label.setText(final_text)
+
+    def on_worker_progress(self, value, message):
+        self.update_progress(value, message)
+
     def load_data(self):
         start_dir = os.path.expanduser("~/Documents")
 
@@ -59,6 +81,8 @@ class SignalAnalyzer(MainWindow):
         file_name = os.path.basename(file_path)
         self.file_label.setText(f"Selected file: {file_name}")
         print("Loading file:", file_path)
+
+        self.show_progress_busy("Loading data...")
 
         file_type = os.path.splitext(file_path)[1].lower()
         file_size = os.path.getsize(file_path)
@@ -104,6 +128,7 @@ class SignalAnalyzer(MainWindow):
             self.thread = QThread()
             self.worker = PeakWorker(self.signal_1, self.signal_2)
             self.worker.moveToThread(self.thread)
+            self.worker.progress.connect(self.on_worker_progress)
             self.thread.started.connect(self.worker.run)
             self.worker.finished.connect(self.on_peaks_detection_finished)
             self.worker.error.connect(self.on_peaks_detection_error)
@@ -111,10 +136,13 @@ class SignalAnalyzer(MainWindow):
             self.worker.finished.connect(self.worker.deleteLater)
             self.thread.finished.connect(self.thread.deleteLater)
 
+            self.update_progress(0, "Detecting peaks...")
+
             self.thread.start()
 
         except Exception as e:
             print("Error loading file:", e)
+            self.hide_progress("Error while loading")
 
     def on_peaks_detection_finished(self, tumor_peaks_1, tumor_peaks_2, water_peaks_1, water_peaks_2, baseline_1, baseline_2, total_tumor_size_1, total_tumor_size_2):
         self.s1_tumor_peaks = tumor_peaks_1
@@ -130,16 +158,21 @@ class SignalAnalyzer(MainWindow):
         self.peaks_1_count_label.setText(f"Signal 1 tumor peaks: {len(tumor_peaks_1)}")
         self.peaks_2_count_label.setText(f"Signal 2 tumor peaks: {len(tumor_peaks_2)}")
 
-    @staticmethod
-    def on_peaks_detection_error(message):
+        self.hide_progress("Peaks are ready")
+
+    def on_peaks_detection_error(self, message):
         print("Error detecting peaks:", message)
+        self.hide_progress("Error during peak detection")
 
     def convert_file_to_bin(self):
+        self.show_progress_busy("Converting to .bin...")
+
         start_dir = os.path.expanduser("~/Documents")
         file_path, _ = QFileDialog.getOpenFileName(self,"Select a file", start_dir,"All files (*)")
 
         if not file_path:
             print("No file selected.")
+            self.hide_progress("Conversion cancelled")
             return
 
         save_path, _ = QFileDialog.getSaveFileName(
@@ -150,10 +183,17 @@ class SignalAnalyzer(MainWindow):
         )
         if not save_path:
             print("Save cancelled.")
+            self.hide_progress("Conversion cancelled")
             return
 
-        saved_file = csv_to_bin(file_path, save_path)
-        print(f"File converted and saved to: {saved_file}")
+        try:
+            saved_file = csv_to_bin(file_path, save_path)
+            print(f"File converted and saved to: {saved_file}")
+            self.hide_progress("Conversion finished")
+        except Exception as e:
+            print("Error converting file:", e)
+            self.hide_progress("Conversion error")
+
 
     def get_plotting_range(self):
         start = self.plotting_start_index

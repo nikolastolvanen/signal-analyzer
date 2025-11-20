@@ -5,6 +5,7 @@ from algorithms import find_peaks, compute_baseline
 class PeakWorker(QObject):
     finished = Signal(np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, float, float)
     error = Signal(str)
+    progress = Signal(int, str)
 
     def __init__(self, signal_1: np.ndarray, signal_2: np.ndarray):
         super().__init__()
@@ -44,13 +45,28 @@ class PeakWorker(QObject):
 
     def run(self):
         try:
-
             print("Baseline computation and peak detection started.")
+
+            self.progress.emit(0, "Processing signal 1...")
             tumor_peaks_1, water_peaks_1, baseline_1, total_tumor_size_1 = self.process_signal(self.signal_1)
+
+            self.progress.emit(50, "Processing signal 2...")
             tumor_peaks_2, water_peaks_2, baseline_2, total_tumor_size_2 = self.process_signal(self.signal_2)
+
             print("Baseline computation and peak detection ended.")
 
-            self.finished.emit(tumor_peaks_1, tumor_peaks_2, water_peaks_1, water_peaks_2, baseline_1, baseline_2, total_tumor_size_1, total_tumor_size_2)
+            self.progress.emit(100, "Peaks detected")
+
+            self.finished.emit(
+                tumor_peaks_1,
+                tumor_peaks_2,
+                water_peaks_1,
+                water_peaks_2,
+                baseline_1,
+                baseline_2,
+                total_tumor_size_1,
+                total_tumor_size_2,
+            )
 
         except Exception as e:
             self.error.emit(str(e))
