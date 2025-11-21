@@ -3,7 +3,7 @@ import numpy as np
 from algorithms import find_peaks, compute_baseline
 
 class PeakWorker(QObject):
-    finished = Signal(np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, float, float)
+    finished = Signal(np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray)
     error = Signal(str)
     progress = Signal(int, str)
 
@@ -11,7 +11,7 @@ class PeakWorker(QObject):
         super().__init__()
         self.signal_1 = signal_1
         self.signal_2 = signal_2
-        self.section_size = 600000
+        self.section_size = 200000
 
     def process_signal(self, signal: np.ndarray):
         signal_length = len(signal)
@@ -19,7 +19,6 @@ class PeakWorker(QObject):
         baselines = []
         all_tumor_peaks = []
         all_water_peaks = []
-        total_tumor_size = 0
         total_signal_sd = np.std(signal)
 
         for sect in range(0, signal_length, self.section_size):
@@ -28,19 +27,33 @@ class PeakWorker(QObject):
             section = signal[start:end]
 
             section_sd = np.std(section)
-            section_mean = np.mean(section)
 
             section_bl = compute_baseline(section)
             baselines.append(np.full_like(section, section_bl, dtype=float))
 
-            tumor_peaks, water_peaks, tumor_size = find_peaks(section, section_bl, section_sd, section_mean, total_signal_sd)
+            extend = 10000
+            start_extended = max(0, start - extend)
+            end_extended = min(signal_length, end + extend)
+            extended_section = signal[start_extended:end_extended]
 
-            all_tumor_peaks.extend(tumor_peaks + start)
-            all_water_peaks.extend(water_peaks + start)
-            total_tumor_size += tumor_size
+            tumor_peaks_from_ext, water_peaks_from_ext = find_peaks(
+                extended_section,
+                baseline=section_bl,
+                section_sd=section_sd,
+                signal_total_sd=total_signal_sd
+            )
+
+            tumor_peaks_from_ext = tumor_peaks_from_ext + start_extended
+            water_peaks_from_ext = water_peaks_from_ext + start_extended
+
+            tumor_peaks = tumor_peaks_from_ext[(tumor_peaks_from_ext >= start) & (tumor_peaks_from_ext < end)]
+            water_peaks = water_peaks_from_ext[(water_peaks_from_ext >= start) & (water_peaks_from_ext < end)]
+
+            all_tumor_peaks.extend(tumor_peaks)
+            all_water_peaks.extend(water_peaks)
 
         full_baseline = np.concatenate(baselines)
-        return np.array(all_tumor_peaks), np.array(all_water_peaks), full_baseline, total_tumor_size
+        return np.array(all_tumor_peaks), np.array(all_water_peaks), full_baseline
 
 
     def run(self):
@@ -48,10 +61,10 @@ class PeakWorker(QObject):
             print("Baseline computation and peak detection started.")
 
             self.progress.emit(0, "Processing signal 1...")
-            tumor_peaks_1, water_peaks_1, baseline_1, total_tumor_size_1 = self.process_signal(self.signal_1)
+            tumor_peaks_1, water_peaks_1, baseline_1 = self.process_signal(self.signal_1)
 
             self.progress.emit(50, "Processing signal 2...")
-            tumor_peaks_2, water_peaks_2, baseline_2, total_tumor_size_2 = self.process_signal(self.signal_2)
+            tumor_peaks_2, water_peaks_2, baseline_2 = self.process_signal(self.signal_2)
 
             print("Baseline computation and peak detection ended.")
 
@@ -63,9 +76,7 @@ class PeakWorker(QObject):
                 water_peaks_1,
                 water_peaks_2,
                 baseline_1,
-                baseline_2,
-                total_tumor_size_1,
-                total_tumor_size_2,
+                baseline_2
             )
 
         except Exception as e:

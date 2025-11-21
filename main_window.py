@@ -9,13 +9,15 @@ from matplotlib.backends.backend_qt5agg import (
 from matplotlib.figure import Figure
 from qtpy.QtCore import Qt
 from superqt import QRangeSlider
+from PySide6.QtGui import QIcon
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.setWindowIcon(QIcon("icon.ico"))
         self.setWindowTitle("Signal analyzer")
-        self.resize(1000, 600)
+        self.resize(1100, 700)
 
         self.menu_bar = QMenuBar(self)
         self.setMenuBar(self.menu_bar)
@@ -35,6 +37,7 @@ class MainWindow(QMainWindow):
         left_panel = QVBoxLayout()
         main_layout.addLayout(left_panel, 1)
 
+        left_panel.addSpacing(10)
         file_info_title = QLabel("File info")
         file_info_title.setProperty("role", "title")
         left_panel.addWidget(file_info_title)
@@ -73,17 +76,34 @@ class MainWindow(QMainWindow):
         line.setStyleSheet("margin: 6px 0;")
         left_panel.addWidget(line)
 
+        plot_controls_title = QLabel("Plot controls")
+        plot_controls_title.setProperty("role", "title")
+        left_panel.addWidget(plot_controls_title)
+
         self.peaks_checkbox = QCheckBox("Show peaks")
-        self.peaks_checkbox.setChecked(False)
+        self.peaks_checkbox.setChecked(True)
+        self.peaks_checkbox.setEnabled(False)
         left_panel.addWidget(self.peaks_checkbox)
 
         self.water_checkbox = QCheckBox("Show water")
         self.water_checkbox.setChecked(False)
+        self.water_checkbox.setEnabled(False)
         left_panel.addWidget(self.water_checkbox)
 
         self.baseline_checkbox = QCheckBox("Show baseline")
         self.baseline_checkbox.setChecked(False)
+        self.baseline_checkbox.setEnabled(False)
         left_panel.addWidget(self.baseline_checkbox)
+
+        self.signal_1_checkbox = QCheckBox("Signal 1")
+        self.signal_1_checkbox.setChecked(True)
+        self.signal_1_checkbox.setEnabled(False)
+        left_panel.addWidget(self.signal_1_checkbox)
+
+        self.signal_2_checkbox = QCheckBox("Signal 2")
+        self.signal_2_checkbox.setChecked(True)
+        self.signal_2_checkbox.setEnabled(False)
+        left_panel.addWidget(self.signal_2_checkbox)
 
         left_panel.addStretch()
 
@@ -112,8 +132,10 @@ class MainWindow(QMainWindow):
         right_panel.addWidget(self.range_slider)
 
         self.slider_label = QLabel("Range: 0% – 100%")
-        right_panel.addWidget(self.slider_label)
-
         self.range_button = QPushButton("Reset range")
         self.range_button.setFixedSize(100, 30)
-        right_panel.addWidget(self.range_button)
+        range_control_row = QHBoxLayout()
+        range_control_row.addWidget(self.slider_label)
+        range_control_row.addStretch()
+        range_control_row.addWidget(self.range_button)
+        right_panel.addLayout(range_control_row)

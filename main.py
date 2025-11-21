@@ -38,6 +38,8 @@ class SignalAnalyzer(MainWindow):
         self.peaks_checkbox.stateChanged.connect(self.on_checkbox_toggle)
         self.water_checkbox.stateChanged.connect(self.on_checkbox_toggle)
         self.baseline_checkbox.stateChanged.connect(self.on_checkbox_toggle)
+        self.signal_1_checkbox.stateChanged.connect(self.on_checkbox_toggle)
+        self.signal_2_checkbox.stateChanged.connect(self.on_checkbox_toggle)
         self.range_slider.valueChanged.connect(self.on_slider_change)
         self.range_button.clicked.connect(self.reset_slider_range)
 
@@ -82,6 +84,14 @@ class SignalAnalyzer(MainWindow):
         self.file_label.setText(f"Selected file: {file_name}")
         print("Loading file:", file_path)
 
+        self.signal_1_checkbox.setEnabled(False)
+        self.signal_2_checkbox.setEnabled(False)
+        self.baseline_checkbox.setEnabled(False)
+        self.peaks_checkbox.setEnabled(False)
+        self.water_checkbox.setEnabled(False)
+
+        self.reset_slider_range()
+
         self.show_progress_busy("Loading data...")
 
         file_type = os.path.splitext(file_path)[1].lower()
@@ -125,6 +135,9 @@ class SignalAnalyzer(MainWindow):
 
             self.plot_data()
 
+            self.signal_1_checkbox.setEnabled(True)
+            self.signal_2_checkbox.setEnabled(True)
+
             self.thread = QThread()
             self.worker = PeakWorker(self.signal_1, self.signal_2)
             self.worker.moveToThread(self.thread)
@@ -144,7 +157,7 @@ class SignalAnalyzer(MainWindow):
             print("Error loading file:", e)
             self.hide_progress("Error while loading")
 
-    def on_peaks_detection_finished(self, tumor_peaks_1, tumor_peaks_2, water_peaks_1, water_peaks_2, baseline_1, baseline_2, total_tumor_size_1, total_tumor_size_2):
+    def on_peaks_detection_finished(self, tumor_peaks_1, tumor_peaks_2, water_peaks_1, water_peaks_2, baseline_1, baseline_2):
         self.s1_tumor_peaks = tumor_peaks_1
         self.s2_tumor_peaks = tumor_peaks_2
         self.s1_water_peaks = water_peaks_1
@@ -152,11 +165,14 @@ class SignalAnalyzer(MainWindow):
         self.baseline_1 = baseline_1
         self.baseline_2 = baseline_2
 
-        print("Signal 1 total tumor size: " + str(total_tumor_size_1))
-        print("Signal 2 total tumor size: " + str(total_tumor_size_2))
-
         self.peaks_1_count_label.setText(f"Signal 1 tumor peaks: {len(tumor_peaks_1)}")
         self.peaks_2_count_label.setText(f"Signal 2 tumor peaks: {len(tumor_peaks_2)}")
+
+        self.plot_current_range()
+
+        self.peaks_checkbox.setEnabled(True)
+        self.water_checkbox.setEnabled(True)
+        self.baseline_checkbox.setEnabled(True)
 
         self.hide_progress("Peaks are ready")
 
@@ -217,16 +233,16 @@ class SignalAnalyzer(MainWindow):
         self.figure.clear()
         ax = self.figure.add_subplot(111)
 
-        if signal_1 is not None:
+        if self.signal_1_checkbox.isChecked() and signal_1 is not None:
             time_range = self.time[plotting_start_index:plotting_end_index]
             x_down, y_down = minmax_downsample(time_range, signal_1, canvas_width=self.canvas.width())
-            ax.plot(x_down, y_down, label='Signal 1', linewidth=0.8)
+            ax.plot(x_down, y_down, color="cornflowerblue", label='Signal 1', linewidth=0.8)
 
             if self.baseline_checkbox.isChecked() and self.baseline_1 is not None:
                 baseline_range = self.baseline_1[plotting_start_index:plotting_end_index]
                 time_range = self.time[plotting_start_index:plotting_end_index]
                 x_down_b, y_down_b = minmax_downsample(time_range, baseline_range, canvas_width=self.canvas.width())
-                ax.plot(x_down_b, y_down_b, color='black', linewidth=1.5, label='Baseline 1')
+                ax.plot(x_down_b, y_down_b, color='black', linewidth=1.5)
 
             if self.peaks_checkbox.isChecked():
                 tumor_peaks_in_range = self.s1_tumor_peaks[(self.s1_tumor_peaks >= plotting_start_index) & (self.s1_tumor_peaks < plotting_end_index)]
@@ -236,18 +252,18 @@ class SignalAnalyzer(MainWindow):
             if self.water_checkbox.isChecked():
                 water_peaks_in_range = self.s1_water_peaks[(self.s1_water_peaks >= plotting_start_index) & (self.s1_water_peaks < plotting_end_index)]
                 if len(water_peaks_in_range) > 0:
-                    ax.plot(self.time[water_peaks_in_range], self.signal_1[water_peaks_in_range], color='blue', marker='v', linestyle='None', label="Signal 1 water peaks")
+                    ax.plot(self.time[water_peaks_in_range], self.signal_1[water_peaks_in_range], color='blue', marker='v', linestyle='None')
 
-        if signal_2 is not None:
+        if self.signal_2_checkbox.isChecked() and signal_2 is not None:
             time_range = self.time[plotting_start_index:plotting_end_index]
             x_down, y_down = minmax_downsample(time_range, signal_2, canvas_width=self.canvas.width())
-            ax.plot(x_down, y_down, label='Signal 2', linewidth=0.8, alpha=0.9)
+            ax.plot(x_down, y_down, color="orange", label='Signal 2', linewidth=0.8, alpha=0.9)
 
             if self.baseline_checkbox.isChecked() and self.baseline_2 is not None:
                 baseline_range = self.baseline_2[plotting_start_index:plotting_end_index]
                 time_range = self.time[plotting_start_index:plotting_end_index]
                 x_down_b, y_down_b = minmax_downsample(time_range, baseline_range, canvas_width=self.canvas.width())
-                ax.plot(x_down_b, y_down_b, color='black', linewidth=1.5, label='Baseline 2')
+                ax.plot(x_down_b, y_down_b, color='black', linewidth=1.5, label='Baseline')
 
             if self.peaks_checkbox.isChecked():
                 tumor_peaks_in_range = self.s2_tumor_peaks[
@@ -261,7 +277,7 @@ class SignalAnalyzer(MainWindow):
                     (self.s2_water_peaks >= plotting_start_index) & (self.s2_water_peaks < plotting_end_index)]
                 if len(water_peaks_in_range) > 0:
                     ax.plot(self.time[water_peaks_in_range], self.signal_2[water_peaks_in_range], color='blue', marker='v', linestyle='None',
-                            label="Signal 2 water peaks")
+                            label="Water")
 
         ax.set_title("Signal data")
         ax.set_xlabel("Time (seconds)")

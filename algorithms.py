@@ -13,10 +13,9 @@ def find_peaks(x: np.ndarray,
                section_sd: float = None,
                section_mean: float = None,
                signal_total_sd: float = None,
-               distance: int = 8000,
-               prominence: float = 25,
-               local_dist: int = 20000) -> tuple[np.ndarray, np.ndarray, float]:
-
+               distance: int = 15000,
+               prominence: float = 30,
+               local_dist: int = 20000) -> tuple[np.ndarray, np.ndarray]:
 
     try:
         peaks, properties = scipy_find_peaks(
@@ -50,7 +49,7 @@ def find_peaks(x: np.ndarray,
                 tumor_peaks.append(peak_index)
                 total_peak_size += peak_size
 
-        return np.array(tumor_peaks), np.array(water_peaks), total_peak_size
+        return np.array(tumor_peaks), np.array(water_peaks)
 
     except Exception as e:
         print("Error finding peaks:", e)
